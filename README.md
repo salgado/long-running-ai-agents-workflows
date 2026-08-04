@@ -21,9 +21,14 @@ A workflow that remediates failed documents in an Elasticsearch failure store us
 
 ## Setup
 
-### Option A: Restore from backup (recommended)
+### 1. Clone the repository
 
-The `backup/` folder contains a full export of all agents, skills, and workflows.
+```bash
+git clone https://github.com/salgado/long-running-ai-agents-workflows.git
+cd long-running-ai-agents-workflows
+```
+
+### 2. Restore agents, skills, and workflow
 
 ```bash
 export KIBANA_ENDPOINT="https://your-project.kb.region.gcp.elastic.cloud"
@@ -56,32 +61,18 @@ Restore completed successfully
 
 Running the script a second time updates existing components without creating duplicates.
 
-### Option B: Manual setup
-
-#### 1. Configure environment variables
+### 3. Create the data stream
 
 ```bash
 export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
 export ES_API_KEY="your-api-key"
-```
 
-#### 2. Create the data stream with failure store
-
-```bash
 ./scripts/01-setup-failure-store.sh
 ```
 
-Creates the `logs-demo-app` data stream with failure store enabled and ingests 3 valid documents. Run `02-trigger-test.sh` afterwards to ingest invalid documents and trigger the alerting rule.
+Creates the `logs-demo-app` data stream with failure store enabled and ingests 3 valid documents.
 
-#### 3. Create the AI agents
-
-Create two agents in Agent Builder (Kibana). See `agents/` for the full instructions for each agent, or use `backup/save_agents.json` and `backup/save_skills.json` as reference for the complete configuration including tools and skills.
-
-#### 4. Import the workflow
-
-In Kibana, go to **Workflows** and import `workflow/failure-store-remediation.yaml`.
-
-#### 5. Create the alerting rule
+### 4. Create the alerting rule
 
 In Kibana, go to **Management → Rules → Create rule → Elasticsearch query**:
 
@@ -97,9 +88,9 @@ In Kibana, go to **Management → Rules → Create rule → Elasticsearch query*
 - Actions: Add action → Workflows → select `failure_store_remediation`
 - (Optional) Add action → Email → configure notification
 
-#### 6. Test
+### 5. Test
 
-Ingest documents with invalid prices to trigger the alert:
+Ingest invalid documents to trigger the alert:
 
 ```bash
 ./scripts/02-trigger-test.sh
@@ -162,7 +153,7 @@ The happy path completed successfully.
 ├── workflow/
 │   └── failure-store-remediation.yaml        # Complete workflow YAML (v2, automatic execution)
 ├── scripts/
-│   ├── 01-setup-failure-store.sh             # Creates data stream + ingests test data
+│   ├── 01-setup-failure-store.sh             # Creates data stream + ingests 3 valid documents
 │   ├── 02-trigger-test.sh                    # Ingests bad docs to trigger the alert
 │   ├── 03-reset-full-test-environment.sh     # Deletes all test resources
 │   ├── 04-verify-happy-path.sh              # Validates final state after happy path
