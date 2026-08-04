@@ -159,12 +159,9 @@ The happy path completed successfully.
 │   ├── 03-reset-full-test-environment.sh     # Deletes all test resources
 │   ├── 04-verify-happy-path.sh              # Validates final state after happy path
 │   └── restore.py                            # Restores agents, skills, and workflow
-├── backup/
-│   ├── save_agents.json                      # Agent configs with tools and skills
-│   └── save_skills.json                      # Skill definitions including execute-failure-store-fix
-└── agents/
-    ├── failure-analyst-instructions.txt
-    └── remediation-executor-instructions.txt
+└── backup/
+    ├── save_agents.json                      # Agent configs with tools and skills
+    └── save_skills.json                      # Skill definitions including execute-failure-store-fix
 ```
 
 ## Related
