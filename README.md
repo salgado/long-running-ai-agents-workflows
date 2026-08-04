@@ -18,6 +18,13 @@ A workflow that remediates failed documents in an Elasticsearch failure store us
 - An Elastic Cloud Serverless project (Elasticsearch/Search type)
 - Agent Builder (GA, enabled by default on Search projects)
 - Workflows (GA on Elastic Stack 9.4+; enable in Management → Feature Settings on Serverless)
+- The following environment variables:
+
+```bash
+export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
+export ES_API_KEY="your-api-key"
+export KIBANA_ENDPOINT="https://your-project.kb.region.gcp.elastic.cloud"
+```
 
 ## Setup
 
@@ -64,9 +71,6 @@ Running the script a second time updates existing components without creating du
 ### 3. Create the data stream
 
 ```bash
-export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
-export ES_API_KEY="your-api-key"
-
 ./scripts/01-setup-failure-store.sh
 ```
 
@@ -133,9 +137,6 @@ Then watch **Workflows → Executions** for the workflow to start.
 ### Verify after a test run
 
 ```bash
-export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
-export ES_API_KEY="your-api-key"
-
 ./scripts/04-verify-happy-path.sh
 ```
 
