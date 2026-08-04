@@ -70,7 +70,7 @@ curl -s -X PUT "${ES_URL}/_index_template/logs-demo-app-template" \
         }
       }
     }
-  }' | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  acknowledged: {d.get(\"acknowledged\",False)}')"
+  }'
 echo ""
 
 # --- Step 3: Ingest valid documents ---
@@ -114,22 +114,50 @@ fs = sum(1 for i in data['items'] if i['create'].get('failure_store','')=='used'
 print(f'  {fs} docs redirected to failure store')"
 echo ""
 
-# --- Step 5: Verify ---
-echo "[5/5] Verifying..."
+# --- Step 5: Refresh and verify ---
+echo "[5/5] Refreshing and verifying..."
+
+# Make recent indexing operations visible to search and count APIs.
+curl -sS -f -X POST "${ES_URL}/logs-demo-app/_refresh" \
+  -H "${AUTH}" > /dev/null
+
+curl -sS -f -X POST "${ES_URL}/logs-demo-app::failures/_refresh" \
+  -H "${AUTH}" > /dev/null
+
+VALID_COUNT=$(
+  curl -sS -f "${ES_URL}/logs-demo-app/_count" \
+    -H "${AUTH}" |
+  python3 -c 'import sys,json; print(json.load(sys.stdin)["count"])'
+)
+
+FAILURE_COUNT=$(
+  curl -sS -f "${ES_URL}/logs-demo-app::failures/_count" \
+    -H "${AUTH}" |
+  python3 -c 'import sys,json; print(json.load(sys.stdin)["count"])'
+)
 
 echo ""
 echo "  Data stream (valid docs):"
-curl -s "${ES_URL}/logs-demo-app/_count" \
-  -H "${AUTH}" | python3 -c "import sys,json; print(f'    count: {json.load(sys.stdin)[\"count\"]}')"
+echo "    count: ${VALID_COUNT}"
 
 echo ""
 echo "  Failure store (invalid docs):"
-# Refresh to ensure near-real-time visibility
-curl -s -X POST "${ES_URL}/logs-demo-app::failures/_refresh" \
-  -H "${AUTH}" > /dev/null 2>&1
+echo "    count: ${FAILURE_COUNT}"
 
-curl -s "${ES_URL}/logs-demo-app::failures/_count" \
-  -H "${AUTH}" | python3 -c "import sys,json; print(f'    count: {json.load(sys.stdin)[\"count\"]}')"
+if [[ "${VALID_COUNT}" != "3" ]]; then
+  echo ""
+  echo "ERROR: expected 3 documents in logs-demo-app, found ${VALID_COUNT}."
+  exit 1
+fi
+
+if [[ "${FAILURE_COUNT}" != "5" ]]; then
+  echo ""
+  echo "ERROR: expected 5 documents in the failure store, found ${FAILURE_COUNT}."
+  exit 1
+fi
+
+echo ""
+echo "  Counts verified successfully."
 
 echo ""
 echo "  Sample failure store document:"

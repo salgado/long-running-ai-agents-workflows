@@ -4,8 +4,8 @@ description: >
   Long-running workflow that remediates failed documents in a data stream's
   failure store. Triggered by an alerting rule when failures are detected.
   An AI agent diagnoses the root cause and proposes a fix. After human
-  approval, the workflow creates the ingest pipeline and runs the reindex
-  automatically, then pauses for verification.
+  approval, the remediation-executor agent runs the fix automatically,
+  then pauses for verification.
 enabled: true
 tags: [failure-store, remediation, agentic]
 settings:
@@ -60,6 +60,7 @@ steps:
   # 4. GATE 1 - Human approves or rejects the fix (PAUSE)
   - name: gate_fix
     type: waitForInput
+    timeout: 72h
     with:
       message: |
         GATE 1/2 - Fix Approval
@@ -75,6 +76,7 @@ steps:
           approved:
             type: boolean
             title: "Approve fix"
+            default: true
           notes:
             type: string
             title: "Feedback (required if rejecting)"
@@ -86,43 +88,44 @@ steps:
     steps:
       # === APPROVED PATH ===
 
-      # 6. GATE 2 - Execute fix and verify (PAUSE)
-      - name: gate_verify
-        type: waitForInput
+      # 6. Execute the fix automatically via the remediation-executor agent
+      - name: execute_fix
+        type: ai.agent
+        agent-id: remediation-executor
+        timeout: 300s
         with:
           message: |
-            GATE 2/2 - Execute and Verify
+            Run remediation for the "logs-demo-app" failure store.
+
+            The fix has been approved by a human reviewer. Execute the skill
+            'execute-failure-store-fix' immediately without asking for confirmation.
+
+            Report the result: how many documents were reindexed, whether the
+            ingest pipeline was created, and any errors encountered.
+
+      # 7. GATE 2 - Human verifies the result (PAUSE)
+      - name: gate_verify
+        type: waitForApproval
+        timeout: 72h
+        with:
+          message: |
+            GATE 2/2 - Verify Remediation
 
             Data stream: logs-demo-app
             Failed documents: {{ steps.read_failures.output.hits.total.value }}
 
-            The fix has been approved. Open the 'remediation-executor' agent,
-            type "run remediation", and the skill 'execute-failure-store-fix'
-            will handle the rest.
+            The remediation-executor agent has run the fix. Review its report:
 
-            After it finishes, verify the results in Dev Tools:
+            {{ steps.execute_fix.output.message }}
 
-            GET logs-demo-app/_count
-            GET logs-demo-app::failures/_count
+            Were the documents successfully remediated?
+          approveLabel: "Yes, mark as resolved"
+          rejectLabel: "No, escalate"
 
-            Then confirm the outcome below.
-          schema:
-            type: object
-            properties:
-              resolved:
-                type: boolean
-                title: "Mark as resolved"
-              remediated_count:
-                type: number
-                title: "Documents successfully remediated"
-              notes:
-                type: string
-                title: "Notes"
-
-      # 10. Branch on verification
+      # 8. Branch on verification
       - name: route_verify
         type: if
-        condition: "steps.gate_verify.output.response.resolved: true"
+        condition: "steps.gate_verify.output.response.approved: true"
         steps:
           - name: mark_resolved
             type: elasticsearch.index
@@ -131,8 +134,7 @@ steps:
               document:
                 data_stream: "logs-demo-app"
                 status: resolved
-                remediated_count: "{{ steps.gate_verify.output.response.remediated_count }}"
-                notes: "{{ steps.gate_verify.output.response.notes }}"
+                agent_report: "{{ steps.execute_fix.output.message }}"
         else:
           - name: mark_escalated
             type: elasticsearch.index
@@ -141,7 +143,7 @@ steps:
               document:
                 data_stream: "logs-demo-app"
                 status: escalated
-                notes: "{{ steps.gate_verify.output.response.notes }}"
+                agent_report: "{{ steps.execute_fix.output.message }}"
 
     else:
       # === REJECTED PATH - AI revises with feedback ===
@@ -190,6 +192,7 @@ steps:
       # GATE 1b - Revised fix approval (PAUSE)
       - name: gate_fix_revised
         type: waitForInput
+        timeout: 72h
         with:
           message: |
             GATE 1/2 - REVISED Fix Approval
@@ -215,42 +218,43 @@ steps:
         type: if
         condition: "steps.gate_fix_revised.output.response.approved: true"
         steps:
-          # GATE 2 for revised fix
-          - name: gate_verify_v2
-            type: waitForInput
+          # Execute the revised fix via the remediation-executor agent
+          - name: execute_fix_revised
+            type: ai.agent
+            agent-id: remediation-executor
+            timeout: 300s
             with:
               message: |
-                GATE 2/2 - Execute and Verify (Revised Fix)
+                Run remediation for the "logs-demo-app" failure store.
+
+                The revised fix has been approved by a human reviewer. Execute the skill
+                'execute-failure-store-fix' immediately without asking for confirmation.
+
+                Report the result: how many documents were reindexed, whether the
+                ingest pipeline was created, and any errors encountered.
+
+          # GATE 2 for revised fix
+          - name: gate_verify_v2
+            type: waitForApproval
+            timeout: 72h
+            with:
+              message: |
+                GATE 2/2 - Verify Remediation (Revised Fix)
 
                 Data stream: logs-demo-app
                 Failed documents: {{ steps.read_failures.output.hits.total.value }}
 
-                The revised fix has been approved. Open the 'remediation-executor'
-                agent, type "run remediation", and the skill 'execute-failure-store-fix'
-                will handle the rest.
+                The remediation-executor agent has run the revised fix. Review its report:
 
-                After it finishes, verify the results in Dev Tools:
+                {{ steps.execute_fix_revised.output.message }}
 
-                GET logs-demo-app/_count
-                GET logs-demo-app::failures/_count
-
-                Then confirm the outcome below.
-              schema:
-                type: object
-                properties:
-                  resolved:
-                    type: boolean
-                    title: "Mark as resolved"
-                  remediated_count:
-                    type: number
-                    title: "Documents successfully remediated"
-                  notes:
-                    type: string
-                    title: "Notes"
+                Were the documents successfully remediated?
+              approveLabel: "Yes, mark as resolved"
+              rejectLabel: "No, escalate"
 
           - name: route_verify_v2
             type: if
-            condition: "steps.gate_verify_v2.output.response.resolved: true"
+            condition: "steps.gate_verify_v2.output.response.approved: true"
             steps:
               - name: mark_resolved_v2
                 type: elasticsearch.index
@@ -259,8 +263,7 @@ steps:
                   document:
                     data_stream: "logs-demo-app"
                     status: resolved
-                    remediated_count: "{{ steps.gate_verify_v2.output.response.remediated_count }}"
-                    notes: "{{ steps.gate_verify_v2.output.response.notes }}"
+                    agent_report: "{{ steps.execute_fix_revised.output.message }}"
             else:
               - name: mark_escalated_v2
                 type: elasticsearch.index
@@ -269,7 +272,7 @@ steps:
                   document:
                     data_stream: "logs-demo-app"
                     status: escalated
-                    notes: "{{ steps.gate_verify_v2.output.response.notes }}"
+                    agent_report: "{{ steps.execute_fix_revised.output.message }}"
 
         else:
           # Final rejection
