@@ -124,6 +124,42 @@ def request(
     return response
 
 
+def request_agent(
+    method: str,
+    path: str,
+    payload: dict[str, Any],
+) -> requests.Response:
+    """
+    Create or update an agent.
+
+    Some Agent Builder deployments do not yet accept the Technical Preview
+    'visibility' field. Retry without it when the target API rejects it.
+    """
+    try:
+        return request(method, path, json_body=payload)
+    except RuntimeError as error:
+        message = str(error)
+
+        visibility_not_supported = (
+            "visibility" in payload
+            and "visibility" in message
+            and "unexpected" in message
+        )
+
+        if not visibility_not_supported:
+            raise
+
+        compatible_payload = dict(payload)
+        compatible_payload.pop("visibility", None)
+
+        print(
+            "  note: target API does not accept 'visibility'; "
+            "retrying without it"
+        )
+
+        return request(method, path, json_body=compatible_payload)
+
+
 def read_json_file(path: Path, collection_name: str) -> list[dict[str, Any]]:
     if not path.exists():
         raise FileNotFoundError(f"Required file not found: {path}")
@@ -309,19 +345,19 @@ def restore_agents() -> None:
 
         if agent_id in existing_ids:
             payload = build_agent_payload(agent, include_id=False)
-            request(
+            request_agent(
                 "PUT",
                 f"/api/agent_builder/agents/{quote(agent_id, safe='')}",
-                json_body=payload,
+                payload,
             )
             print(f"  updated  {agent_id}")
             updated += 1
         else:
             payload = build_agent_payload(agent, include_id=True)
-            request(
+            request_agent(
                 "POST",
                 "/api/agent_builder/agents",
-                json_body=payload,
+                payload,
             )
             print(f"  created  {agent_id}")
             created += 1
