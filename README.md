@@ -56,10 +56,6 @@ Restore completed successfully
 
 Running the script a second time updates existing components without creating duplicates.
 
-> **Note:** On deployments that do not yet support the `visibility` field (Technical Preview, 9.4+), the script retries automatically without it and prints:
-> `note: target API does not accept 'visibility'; retrying without it`
-> This is not an error.
-
 ### Option B: Manual setup
 
 #### 1. Configure environment variables
