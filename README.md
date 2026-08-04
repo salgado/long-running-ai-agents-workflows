@@ -6,73 +6,86 @@ Code companion for the Elasticsearch Labs blog post: [Long-running AI agents wit
 
 A workflow that remediates failed documents in an Elasticsearch failure store using AI agents and human approval gates:
 
-1. An alerting rule detects failures in the failure store
-2. An AI agent (`failure-analyst`) diagnoses the root cause and proposes a fix
-3. The workflow pauses for engineer approval (days if needed, zero compute cost)
-4. If approved, the workflow pauses again at Gate 2 — the engineer opens the `remediation-executor` agent, types "run remediation", and the `execute-failure-store-fix` skill reads the approved diagnosis from `remediation-runs`, creates the ingest pipeline, and runs the reindex automatically
-5. The engineer verifies the results and marks the case as resolved or escalated
+1. An alerting rule detects failures in the failure store and starts the workflow
+2. The `failure-analyst` agent diagnoses the root cause and proposes a fix
+3. The workflow pauses at Gate 1 for engineer approval (days if needed, zero compute cost)
+4. If approved, the `remediation-executor` agent runs the fix automatically as a workflow step
+5. Gate 2 shows the agent's report and asks the engineer to confirm the result as resolved or escalated
+6. A rejected proposal gets one revision cycle through Gate 1b before the case closes
 
 ## Prerequisites
 
 - An Elastic Cloud Serverless project (Elasticsearch/Search type)
 - Agent Builder (GA, enabled by default on Search projects)
-- Workflows enabled (technical preview; enable in Management → Feature Settings)
+- Workflows (GA on Elastic Stack 9.4+; enable in Management → Feature Settings on Serverless)
 
 ## Setup
 
-### 1. Configure environment variables
+### Option A: Restore from backup (recommended)
+
+The `backup/` folder contains a full export of all agents, skills, and workflows.
+
+```bash
+export KIBANA_ENDPOINT="https://your-project.kb.region.gcp.elastic.cloud"
+export ELASTIC_API_KEY="your-api-key"
+
+pip install requests python-dotenv
+python3 scripts/restore.py
+```
+
+This restores the two agents (`failure-analyst`, `remediation-executor`), the two skills (`failure-store-remediation-planner`, `execute-failure-store-fix`), and the workflow — no manual configuration needed.
+
+Expected output:
+
+```
+Restoring skills
+  created  failure-store-remediation-planner
+  created  execute-failure-store-fix
+  Skills: created=2, updated=0
+
+Restoring agents
+  created  failure-analyst
+  created  remediation-executor
+  Agents: created=2, updated=0
+
+Restoring workflow
+  imported failure_store_remediation
+
+Restore completed successfully
+```
+
+Running the script a second time updates existing components without creating duplicates.
+
+> **Note:** On deployments that do not yet support the `visibility` field (Technical Preview, 9.4+), the script retries automatically without it and prints:
+> `note: target API does not accept 'visibility'; retrying without it`
+> This is not an error.
+
+### Option B: Manual setup
+
+#### 1. Configure environment variables
 
 ```bash
 export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
 export ES_API_KEY="your-api-key"
 ```
 
-### 2. Create the data stream with failure store
+#### 2. Create the data stream with failure store
 
 ```bash
 ./scripts/01-setup-failure-store.sh
 ```
 
-This creates the `logs-demo-app` data stream with failure store enabled, ingests valid documents and documents with invalid `price` values that get redirected to the failure store.
+Creates the `logs-demo-app` data stream with failure store enabled and ingests 3 valid documents. Run `02-trigger-test.sh` afterwards to ingest invalid documents and trigger the alerting rule.
 
-### 3. Create the AI agents
+#### 3. Create the AI agents
 
-Create two agents in Agent Builder (Kibana):
+Create two agents in Agent Builder (Kibana). See `agents/` for the full instructions for each agent, or use `backup/save_agents.json` and `backup/save_skills.json` as reference for the complete configuration including tools and skills.
 
-**failure-analyst** — Analyzes failed documents and proposes remediation.
-- Custom instructions: see `agents/failure-analyst-instructions.txt`
-- Tools: none required (receives data via prompt)
-
-**remediation-executor** — Reads the approved diagnosis and executes the fix.
-- Custom instructions: see `agents/remediation-executor-instructions.txt`
-- Tools: enable built-in capabilities; ensure `platform.core.search` is active
-- Skills: create the `execute-failure-store-fix` skill with the instructions below:
-
-```
-When asked to run a remediation, execute a fix, or remediate failures:
-
-1. Search the remediation-runs index for the most recent document with status
-   "awaiting_fix_approval". Use the query:
-   {"query": {"term": {"status": "awaiting_fix_approval"}},
-    "sort": [{"_doc": "desc"}], "size": 1}
-
-2. From the diagnosis field, extract the remediation_pipeline definition
-   (pipeline name and processors).
-
-3. Create the ingest pipeline in Elasticsearch using the extracted definition.
-
-4. Run a reindex from the failure store index specified in the diagnosis
-   to logs-demo-app, using the pipeline you just created.
-
-5. Report the results: how many documents were matched, successfully
-   reindexed, and how many failed.
-```
-
-### 4. Import the workflow
+#### 4. Import the workflow
 
 In Kibana, go to **Workflows** and import `workflow/failure-store-remediation.yaml`.
 
-### 5. Create the alerting rule
+#### 5. Create the alerting rule
 
 In Kibana, go to **Management → Rules → Create rule → Elasticsearch query**:
 
@@ -88,7 +101,7 @@ In Kibana, go to **Management → Rules → Create rule → Elasticsearch query*
 - Actions: Add action → Workflows → select `failure_store_remediation`
 - (Optional) Add action → Email → configure notification
 
-### 6. Test
+#### 6. Test
 
 Ingest documents with invalid prices to trigger the alert:
 
@@ -96,30 +109,71 @@ Ingest documents with invalid prices to trigger the alert:
 ./scripts/02-trigger-test.sh
 ```
 
-Then watch Workflows → Executions for the workflow to start.
+Then watch **Workflows → Executions** for the workflow to start.
 
 ## How it works
 
-When the workflow reaches Gate 2, the engineer:
+1. Alert fires → workflow starts → `failure-analyst` reads the failure store and diagnoses the problem
+2. **Gate 1**: engineer reviews the diagnosis and approves or rejects
+3. If approved: `remediation-executor` runs the `execute-failure-store-fix` skill automatically — no manual steps needed
+4. **Gate 2**: workflow shows the agent's full report inline; engineer clicks "Yes, mark as resolved" or "No, escalate"
+5. If rejected at Gate 1: `failure-analyst` revises the diagnosis with engineer feedback → **Gate 1b** → same execution path
+6. All outcomes are recorded in `remediation-runs` for auditing
 
-1. Opens the `remediation-executor` agent in Agent Builder
-2. Types "run remediation"
-3. The `execute-failure-store-fix` skill automatically:
-   - Fetches the latest approved diagnosis from `remediation-runs`
-   - Creates the ingest pipeline
-   - Runs the reindex from the failure store to `logs-demo-app`
-   - Reports how many documents were matched, reindexed, and failed
-4. The engineer verifies results in Dev Tools and confirms in the workflow
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `01-setup-failure-store.sh` | Creates the data stream and ingests 3 valid documents |
+| `02-trigger-test.sh` | Ingests 5 invalid docs with current timestamp to trigger the alerting rule |
+| `03-reset-full-test-environment.sh` | Deletes all test resources (preview mode by default; requires `--apply`) |
+| `04-verify-happy-path.sh` | Validates the final state after a complete happy-path execution |
+| `restore.py` | Restores agents, skills, and workflow from `backup/` |
+
+### Reset and rebuild
+
+```bash
+# Preview what will be deleted
+./scripts/03-reset-full-test-environment.sh
+
+# Apply the reset
+./scripts/03-reset-full-test-environment.sh --apply
+
+# Rebuild
+./scripts/01-setup-failure-store.sh
+```
+
+### Verify after a test run
+
+```bash
+export ES_URL="https://your-project.es.region.gcp.elastic.cloud:443"
+export ES_API_KEY="your-api-key"
+
+./scripts/04-verify-happy-path.sh
+```
+
+Expected output ends with:
+
+```
+RESULT: PASSED
+The happy path completed successfully.
+```
 
 ## Files
 
 ```
 ├── README.md
 ├── workflow/
-│   └── failure-store-remediation.yaml   # The complete workflow YAML
+│   └── failure-store-remediation.yaml        # Complete workflow YAML (v2, automatic execution)
 ├── scripts/
-│   ├── 01-setup-failure-store.sh        # Creates data stream + ingests test data
-│   └── 02-trigger-test.sh              # Ingests bad docs to trigger the alert
+│   ├── 01-setup-failure-store.sh             # Creates data stream + ingests test data
+│   ├── 02-trigger-test.sh                    # Ingests bad docs to trigger the alert
+│   ├── 03-reset-full-test-environment.sh     # Deletes all test resources
+│   ├── 04-verify-happy-path.sh              # Validates final state after happy path
+│   └── restore.py                            # Restores agents, skills, and workflow
+├── backup/
+│   ├── save_agents.json                      # Agent configs with tools and skills
+│   └── save_skills.json                      # Skill definitions including execute-failure-store-fix
 └── agents/
     ├── failure-analyst-instructions.txt
     └── remediation-executor-instructions.txt
