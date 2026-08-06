@@ -75,7 +75,7 @@ echo "  Done"
 echo ""
 
 # --- Step 3: Ingest valid documents ---
-echo "[3/3] Ingesting 3 valid documents (price as float)..."
+echo "[3/4] Ingesting 3 valid documents (price as float)..."
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 curl -sS -f -X POST "${ES_URL}/_bulk" \
   -H "${AUTH}" \
@@ -94,8 +94,24 @@ print(f'  {ok} docs indexed into data stream')
 "
 echo ""
 
+# --- Step 4: Ingest one invalid document with old timestamp (initializes failure store) ---
+echo "[4/4] Ingesting 1 invalid document with old timestamp (initializes failure store)..."
+OLD_TS=$(date -u -v-1H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '1 hour ago' +"%Y-%m-%dT%H:%M:%SZ")
+curl -sS -f -X POST "${ES_URL}/_bulk" \
+  -H "${AUTH}" \
+  -H "Content-Type: application/x-ndjson" \
+  -d "{\"create\":{\"_index\":\"logs-demo-app\"}}
+{\"@timestamp\":\"${OLD_TS}\",\"message\":\"Order failed\",\"price\":\"SETUP\",\"status\":\"failed\",\"user_id\":\"u-setup-init\",\"category\":\"setup\"}
+" > /dev/null
+echo "  Done (document is in failure store with a 1-hour-old timestamp — will not trigger the alerting rule)"
+echo ""
+
 echo "============================================"
 echo "  Setup complete!"
+echo ""
+echo "  State:"
+echo "    logs-demo-app           → 3 valid documents"
+echo "    logs-demo-app::failures → 1 document (old timestamp, safe)"
 echo ""
 echo "  Next steps:"
 echo "    1. Run restore.py to import agents, skills, and workflow"

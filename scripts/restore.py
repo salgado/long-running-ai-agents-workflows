@@ -38,7 +38,7 @@ WORKFLOW_FILE = ROOT_DIR / "workflow" / "failure-store-remediation.yaml"
 load_dotenv(ROOT_DIR / ".env")
 
 KIBANA_ENDPOINT = os.getenv("KIBANA_ENDPOINT", "").rstrip("/")
-API_KEY = os.getenv("ELASTIC_API_KEY", "")
+API_KEY = os.getenv("ES_API_KEY", "") or os.getenv("ELASTIC_API_KEY", "")
 SPACE_ID = os.getenv("KIBANA_SPACE_ID", "").strip()
 
 if not KIBANA_ENDPOINT or not API_KEY:
