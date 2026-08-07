@@ -6,6 +6,9 @@
 #   1. Deletes the existing data stream and index template (if they exist)
 #   2. Creates an index template with failure store enabled
 #   3. Ingests 3 valid documents (indexed normally into the data stream)
+#   4. Initializes the failure store index (creates and immediately deletes
+#      one invalid document so the @timestamp field is available in Kibana
+#      when configuring the alerting rule)
 #
 # Use 02-trigger-test.sh to ingest invalid documents, which triggers the
 # alerting rule and starts the remediation workflow.
@@ -94,16 +97,42 @@ print(f'  {ok} docs indexed into data stream')
 "
 echo ""
 
-# --- Step 4: Ingest one invalid document with old timestamp (initializes failure store) ---
-echo "[4/4] Ingesting 1 invalid document with old timestamp (initializes failure store)..."
-OLD_TS=$(date -u -v-1H +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u -d '1 hour ago' +"%Y-%m-%dT%H:%M:%SZ")
-curl -sS -f -X POST "${ES_URL}/_bulk" \
+# --- Step 4: Initialize failure store and delete the init document ---
+echo "[4/4] Initializing failure store (creates the index, then removes the init document)..."
+BULK_RESPONSE=$(curl -sS -f -X POST "${ES_URL}/_bulk" \
   -H "${AUTH}" \
   -H "Content-Type: application/x-ndjson" \
   -d "{\"create\":{\"_index\":\"logs-demo-app\"}}
-{\"@timestamp\":\"${OLD_TS}\",\"message\":\"Order failed\",\"price\":\"SETUP\",\"status\":\"failed\",\"user_id\":\"u-setup-init\",\"category\":\"setup\"}
-" > /dev/null
-echo "  Done (document is in failure store with a 1-hour-old timestamp — will not trigger the alerting rule)"
+{\"@timestamp\":\"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\",\"message\":\"init\",\"price\":\"SETUP\",\"status\":\"init\",\"user_id\":\"u-setup-init\",\"category\":\"setup\"}
+")
+
+# Extract the backing index and document ID from the bulk response
+FS_INDEX=$(echo "$BULK_RESPONSE" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for item in data.get('items', []):
+    c = item.get('create', {})
+    if c.get('failure_store') == 'used':
+        print(c.get('_index', ''))
+        break
+")
+FS_ID=$(echo "$BULK_RESPONSE" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+for item in data.get('items', []):
+    c = item.get('create', {})
+    if c.get('failure_store') == 'used':
+        print(c.get('_id', ''))
+        break
+")
+
+if [[ -n "$FS_INDEX" && -n "$FS_ID" ]]; then
+  curl -sS -f -X DELETE "${ES_URL}/${FS_INDEX}/_doc/${FS_ID}?refresh=true" \
+    -H "${AUTH}" > /dev/null
+  echo "  Failure store initialized and init document deleted"
+else
+  echo "  Warning: could not locate init document in failure store — check manually"
+fi
 echo ""
 
 echo "============================================"
@@ -111,7 +140,7 @@ echo "  Setup complete!"
 echo ""
 echo "  State:"
 echo "    logs-demo-app           → 3 valid documents"
-echo "    logs-demo-app::failures → 1 document (old timestamp, safe)"
+echo "    logs-demo-app::failures → 0 documents (empty, index initialized)"
 echo ""
 echo "  Next steps:"
 echo "    1. Run restore.py to import agents, skills, and workflow"

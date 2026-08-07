@@ -30,7 +30,7 @@ echo ""
 echo "Ingesting 5 documents with invalid price values..."
 echo ""
 
-curl -s -X POST "${ES_URL}/_bulk" \
+curl -sS -f -X POST "${ES_URL}/_bulk" \
   -H "${AUTH}" \
   -H "Content-Type: application/x-ndjson" \
   -d "{\"create\":{\"_index\":\"logs-demo-app\"}}

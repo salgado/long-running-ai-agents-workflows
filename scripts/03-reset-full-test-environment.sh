@@ -216,9 +216,9 @@ verify_gone "failure store"  "/$(urlencode "${DATA_STREAM}::failures")/_count"
 verify_gone "index template" "/_index_template/$(urlencode "$INDEX_TEMPLATE")"
 
 if [[ -n "$PIPELINE_IDS" ]]; then
-  echo "$PIPELINE_IDS" | while IFS= read -r pid; do
+  while IFS= read -r pid; do
     [[ -n "$pid" ]] && verify_gone "pipeline $pid" "/_ingest/pipeline/$(urlencode "$pid")"
-  done
+  done < <(printf '%s\n' "$PIPELINE_IDS")
 fi
 
 echo ""

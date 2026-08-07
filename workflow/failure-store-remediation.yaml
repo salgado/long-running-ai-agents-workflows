@@ -15,13 +15,16 @@ triggers:
   - type: alert
 
 steps:
-  # 1. Read failed documents from the failure store
+  # 1. Read failed documents from the failure store (last 5 minutes, matching the alert window)
   - name: read_failures
     type: elasticsearch.search
     with:
       index: "logs-demo-app::failures"
       query:
-        match_all: {}
+        range:
+          "@timestamp":
+            gte: "now-5m"
+            lte: "now"
       size: 50
       sort:
         - "@timestamp": "desc"
@@ -51,9 +54,12 @@ steps:
     with:
       index: remediation-runs
       document:
+        "@timestamp": "{{ now }}"
+        execution_id: "{{ execution.id }}"
         data_stream: "logs-demo-app"
         triggered_by_rule: "{{ event.rule.name }}"
-        failure_count: "{{ steps.read_failures.output.hits.total.value }}"
+        failure_count: "{{ steps.read_failures.output.hits.hits | size }}"
+        failure_count_total: "{{ steps.read_failures.output.hits.total.value }}"
         diagnosis: "{{ steps.diagnose.output | json }}"
         status: awaiting_fix_approval
 
@@ -97,6 +103,8 @@ steps:
           message: |
             Run remediation for the "logs-demo-app" failure store.
 
+            Workflow execution ID: {{ execution.id }}
+
             The fix has been approved by a human reviewer. Execute the skill
             'execute-failure-store-fix' immediately without asking for confirmation.
 
@@ -132,6 +140,8 @@ steps:
             with:
               index: remediation-runs
               document:
+                "@timestamp": "{{ now }}"
+                execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: resolved
                 agent_report: "{{ steps.execute_fix.output.message }}"
@@ -141,6 +151,8 @@ steps:
             with:
               index: remediation-runs
               document:
+                "@timestamp": "{{ now }}"
+                execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: escalated
                 agent_report: "{{ steps.execute_fix.output.message }}"
@@ -153,6 +165,8 @@ steps:
         with:
           index: remediation-runs
           document:
+            "@timestamp": "{{ now }}"
+            execution_id: "{{ execution.id }}"
             data_stream: "logs-demo-app"
             status: fix_revision_requested
             reviewer_feedback: "{{ steps.gate_fix.output.response.notes }}"
@@ -185,6 +199,8 @@ steps:
         with:
           index: remediation-runs
           document:
+            "@timestamp": "{{ now }}"
+            execution_id: "{{ execution.id }}"
             data_stream: "logs-demo-app"
             revised_diagnosis: "{{ steps.revise_diagnosis.output | json }}"
             status: awaiting_fix_approval_v2
@@ -195,7 +211,7 @@ steps:
         timeout: 72h
         with:
           message: |
-            GATE 1/2 - REVISED Fix Approval
+            GATE 1b/2 - Revised Fix Approval
 
             Data stream: logs-demo-app
             Your feedback: {{ steps.gate_fix.output.response.notes }}
@@ -226,6 +242,8 @@ steps:
             with:
               message: |
                 Run remediation for the "logs-demo-app" failure store.
+
+                Workflow execution ID: {{ execution.id }}
 
                 The revised fix has been approved by a human reviewer. Execute the skill
                 'execute-failure-store-fix' immediately without asking for confirmation.
@@ -261,6 +279,8 @@ steps:
                 with:
                   index: remediation-runs
                   document:
+                    "@timestamp": "{{ now }}"
+                    execution_id: "{{ execution.id }}"
                     data_stream: "logs-demo-app"
                     status: resolved
                     agent_report: "{{ steps.execute_fix_revised.output.message }}"
@@ -270,6 +290,8 @@ steps:
                 with:
                   index: remediation-runs
                   document:
+                    "@timestamp": "{{ now }}"
+                    execution_id: "{{ execution.id }}"
                     data_stream: "logs-demo-app"
                     status: escalated
                     agent_report: "{{ steps.execute_fix_revised.output.message }}"
@@ -281,6 +303,8 @@ steps:
             with:
               index: remediation-runs
               document:
+                "@timestamp": "{{ now }}"
+                execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: fix_rejected
                 notes: "{{ steps.gate_fix_revised.output.response.notes }}"
