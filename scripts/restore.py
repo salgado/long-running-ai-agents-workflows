@@ -42,7 +42,7 @@ API_KEY = os.getenv("ES_API_KEY", "") or os.getenv("ELASTIC_API_KEY", "")
 SPACE_ID = os.getenv("KIBANA_SPACE_ID", "").strip()
 
 if not KIBANA_ENDPOINT or not API_KEY:
-    print("Error: KIBANA_ENDPOINT and ELASTIC_API_KEY must be set.")
+    print("Error: KIBANA_ENDPOINT and ES_API_KEY must be set.")
     print("")
     print("Export them or create a .env file in the repository root:")
     print("")

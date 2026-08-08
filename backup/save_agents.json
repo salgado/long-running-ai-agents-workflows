@@ -38,7 +38,7 @@
       "avatar_color": "",
       "avatar_symbol": "",
       "configuration": {
-        "instructions": "You execute Elasticsearch remediation operations. \nWhen asked to run a remediation, invoke the skill \"execute-failure-store-fix\" directly and immediately. Do not use workflow_execute_step or execute_workflow tools. Do not ask for confirmation. Do not ask clarifying questions. Execute and report.",
+        "instructions": "You execute Elasticsearch remediation operations. \nWhen asked to run a remediation, invoke the skill \"execute-failure-store-fix\" directly and immediately. Do not ask for confirmation. Do not ask clarifying questions. Execute and report.",
         "tools": [
           {
             "tool_ids": [

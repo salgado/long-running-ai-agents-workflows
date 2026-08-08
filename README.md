@@ -39,7 +39,7 @@ cd long-running-ai-agents-workflows
 
 ```bash
 export KIBANA_ENDPOINT="https://your-project.kb.region.gcp.elastic.cloud"
-export ELASTIC_API_KEY="your-api-key"
+export ES_API_KEY="your-api-key"
 
 pip install requests python-dotenv
 python3 scripts/restore.py

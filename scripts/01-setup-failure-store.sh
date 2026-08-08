@@ -9,6 +9,8 @@
 #   4. Initializes the failure store index (creates and immediately deletes
 #      one invalid document so the @timestamp field is available in Kibana
 #      when configuring the alerting rule)
+#   5. Creates the remediation-runs index with explicit keyword mappings for
+#      execution_id and status so term queries work correctly
 #
 # Use 02-trigger-test.sh to ingest invalid documents, which triggers the
 # alerting rule and starts the remediation workflow.
@@ -39,16 +41,18 @@ echo "============================================"
 echo ""
 
 # --- Step 1: Clean up previous environment ---
-echo "[1/3] Cleaning up previous environment..."
+echo "[1/5] Cleaning up previous environment..."
 curl -s -X DELETE "${ES_URL}/_data_stream/logs-demo-app" \
   -H "${AUTH}" > /dev/null 2>&1 || true
 curl -s -X DELETE "${ES_URL}/_index_template/logs-demo-app-template" \
+  -H "${AUTH}" > /dev/null 2>&1 || true
+curl -s -X DELETE "${ES_URL}/remediation-runs" \
   -H "${AUTH}" > /dev/null 2>&1 || true
 echo "  Done"
 echo ""
 
 # --- Step 2: Create index template with failure store ---
-echo "[2/3] Creating index template with failure store enabled..."
+echo "[2/5] Creating index template with failure store enabled..."
 curl -sS -f -X PUT "${ES_URL}/_index_template/logs-demo-app-template" \
   -H "${AUTH}" \
   -H "${CT}" \
@@ -78,7 +82,7 @@ echo "  Done"
 echo ""
 
 # --- Step 3: Ingest valid documents ---
-echo "[3/4] Ingesting 3 valid documents (price as float)..."
+echo "[3/5] Ingesting 3 valid documents (price as float)..."
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 curl -sS -f -X POST "${ES_URL}/_bulk" \
   -H "${AUTH}" \
@@ -98,7 +102,7 @@ print(f'  {ok} docs indexed into data stream')
 echo ""
 
 # --- Step 4: Initialize failure store and delete the init document ---
-echo "[4/4] Initializing failure store (creates the index, then removes the init document)..."
+echo "[4/5] Initializing failure store (creates the index, then removes the init document)..."
 BULK_RESPONSE=$(curl -sS -f -X POST "${ES_URL}/_bulk" \
   -H "${AUTH}" \
   -H "Content-Type: application/x-ndjson" \
@@ -135,16 +139,34 @@ else
 fi
 echo ""
 
+# --- Step 5: Create remediation-runs with explicit keyword mappings ---
+echo "[5/5] Creating remediation-runs index with explicit mappings..."
+curl -sS -f -X PUT "${ES_URL}/remediation-runs" \
+  -H "${AUTH}" \
+  -H "${CT}" \
+  -d '{
+    "mappings": {
+      "properties": {
+        "@timestamp":   { "type": "date" },
+        "execution_id": { "type": "keyword" },
+        "status":       { "type": "keyword" },
+        "data_stream":  { "type": "keyword" }
+      }
+    }
+  }' > /dev/null
+echo "  Done"
+echo ""
+
 echo "============================================"
 echo "  Setup complete!"
 echo ""
 echo "  State:"
 echo "    logs-demo-app           → 3 valid documents"
 echo "    logs-demo-app::failures → 0 documents (empty, index initialized)"
+echo "    remediation-runs        → created with explicit keyword mappings"
 echo ""
 echo "  Next steps:"
-echo "    1. Run restore.py to import agents, skills, and workflow"
-echo "    2. Create the alerting rule in Kibana"
-echo "    3. Connect the rule to the failure_store_remediation workflow"
-echo "    4. Run 02-trigger-test.sh to ingest invalid documents and start the workflow"
+echo "    1. Run restore.py (if not already done) to import agents, skills, and workflow"
+echo "    2. Create the alerting rule in Kibana and connect it to the failure_store_remediation workflow"
+echo "    3. Enable the rule, then run 02-trigger-test.sh to ingest invalid documents and start the workflow"
 echo "============================================"
