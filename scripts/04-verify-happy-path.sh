@@ -125,7 +125,7 @@ echo "  OK"
 echo ""
 
 echo "[4/6] Reading remediation pipelines..."
-api_request GET "/_ingest/pipeline/*logs-demo-app*" "${TMP_DIR}/pipelines.json"
+api_request GET "/_ingest/pipeline" "${TMP_DIR}/pipelines.json"
 echo "  OK"
 echo ""
 
