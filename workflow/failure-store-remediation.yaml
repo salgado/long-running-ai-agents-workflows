@@ -63,7 +63,7 @@ steps:
         triggered_by_rule: "{{ event.rule.name }}"
         failure_count: "{{ steps.read_failures.output.hits.hits | size }}"
         failure_count_total: "{{ steps.read_failures.output.hits.total.value }}"
-        diagnosis: "{{ steps.diagnose.output | json }}"
+        diagnosis: "{{ steps.diagnose.output.message }}"
         status: awaiting_fix_approval
 
   # 4. GATE 1 - Human approves or rejects the fix (PAUSE)
@@ -209,7 +209,7 @@ steps:
             "@timestamp": "{{ now | date_to_xmlschema }}"
             execution_id: "{{ execution.id }}"
             data_stream: "logs-demo-app"
-            revised_diagnosis: "{{ steps.revise_diagnosis.output | json }}"
+            revised_diagnosis: "{{ steps.revise_diagnosis.output.message }}"
             status: awaiting_fix_approval_v2
 
       # GATE 1b - Revised fix approval (PAUSE)
