@@ -72,7 +72,7 @@ steps:
         GATE 1/2 - Fix Approval
 
         Data stream: logs-demo-app
-        Failed documents: {{ steps.read_failures.output.hits.total.value }}
+        Failed documents loaded for analysis: {{ steps.read_failures.output.hits.hits | size }} of {{ steps.read_failures.output.hits.total.value }} matching
 
         The AI agent has diagnosed the failures. Review the full diagnosis
         in the 'diagnose' step output above, then approve or reject.
@@ -120,7 +120,7 @@ steps:
             GATE 2/2 - Verify Remediation
 
             Data stream: logs-demo-app
-            Failed documents: {{ steps.read_failures.output.hits.total.value }}
+            Failed documents loaded for analysis: {{ steps.read_failures.output.hits.hits | size }} of {{ steps.read_failures.output.hits.total.value }} matching
 
             The remediation-executor agent has run the fix. Review its report:
 
@@ -260,7 +260,7 @@ steps:
                 GATE 2/2 - Verify Remediation (Revised Fix)
 
                 Data stream: logs-demo-app
-                Failed documents: {{ steps.read_failures.output.hits.total.value }}
+                Failed documents loaded for analysis: {{ steps.read_failures.output.hits.hits | size }} of {{ steps.read_failures.output.hits.total.value }} matching
 
                 The remediation-executor agent has run the revised fix. Review its report:
 

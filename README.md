@@ -90,7 +90,9 @@ In Kibana, go to **Management → Rules → Create rule → Elasticsearch query*
   ```
 - Check every: 1 minute
 - Actions: Add action → Workflows → select `failure_store_remediation`
-- (Optional) Add action → Email → configure notification
+- Run workflow for: **New alerts**
+- Action frequency: **Run per alert**
+- Save and enable the rule
 
 ### 5. Test
 
@@ -110,6 +112,10 @@ Then watch **Workflows → Executions** for the workflow to start.
 4. **Gate 2**: workflow shows the agent's full report inline; engineer clicks "Yes, mark as resolved" or "No, escalate"
 5. If rejected at Gate 1: `failure-analyst` revises the diagnosis with engineer feedback → **Gate 1b** → same execution path
 6. All outcomes are recorded in `remediation-runs` for auditing
+
+### Gate timeouts
+
+Each approval gate has a 72-hour timeout. If no response is submitted before the gate expires, the step fails — it is not treated as a rejection. Independently, the seven-day workflow timeout cancels an execution that has not reached a terminal state by then.
 
 ## Scripts
 
