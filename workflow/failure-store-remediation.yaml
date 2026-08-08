@@ -54,7 +54,7 @@ steps:
     with:
       index: remediation-runs
       document:
-        "@timestamp": "{{ now }}"
+        "@timestamp": "{{ now | date_to_xmlschema }}"
         execution_id: "{{ execution.id }}"
         data_stream: "logs-demo-app"
         triggered_by_rule: "{{ event.rule.name }}"
@@ -140,7 +140,7 @@ steps:
             with:
               index: remediation-runs
               document:
-                "@timestamp": "{{ now }}"
+                "@timestamp": "{{ now | date_to_xmlschema }}"
                 execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: resolved
@@ -151,7 +151,7 @@ steps:
             with:
               index: remediation-runs
               document:
-                "@timestamp": "{{ now }}"
+                "@timestamp": "{{ now | date_to_xmlschema }}"
                 execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: escalated
@@ -165,7 +165,7 @@ steps:
         with:
           index: remediation-runs
           document:
-            "@timestamp": "{{ now }}"
+            "@timestamp": "{{ now | date_to_xmlschema }}"
             execution_id: "{{ execution.id }}"
             data_stream: "logs-demo-app"
             status: fix_revision_requested
@@ -199,7 +199,7 @@ steps:
         with:
           index: remediation-runs
           document:
-            "@timestamp": "{{ now }}"
+            "@timestamp": "{{ now | date_to_xmlschema }}"
             execution_id: "{{ execution.id }}"
             data_stream: "logs-demo-app"
             revised_diagnosis: "{{ steps.revise_diagnosis.output | json }}"
@@ -279,7 +279,7 @@ steps:
                 with:
                   index: remediation-runs
                   document:
-                    "@timestamp": "{{ now }}"
+                    "@timestamp": "{{ now | date_to_xmlschema }}"
                     execution_id: "{{ execution.id }}"
                     data_stream: "logs-demo-app"
                     status: resolved
@@ -290,7 +290,7 @@ steps:
                 with:
                   index: remediation-runs
                   document:
-                    "@timestamp": "{{ now }}"
+                    "@timestamp": "{{ now | date_to_xmlschema }}"
                     execution_id: "{{ execution.id }}"
                     data_stream: "logs-demo-app"
                     status: escalated
@@ -303,7 +303,7 @@ steps:
             with:
               index: remediation-runs
               document:
-                "@timestamp": "{{ now }}"
+                "@timestamp": "{{ now | date_to_xmlschema }}"
                 execution_id: "{{ execution.id }}"
                 data_stream: "logs-demo-app"
                 status: fix_rejected
