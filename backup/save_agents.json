@@ -38,7 +38,7 @@
       "avatar_color": "",
       "avatar_symbol": "",
       "configuration": {
-        "instructions": "You execute Elasticsearch remediation operations. \nWhen asked to run a remediation, invoke the skill \"execute-failure-store-fix\" directly and immediately. Do not ask for confirmation. Do not ask clarifying questions. Execute and report.",
+        "instructions": "You execute Elasticsearch remediation operations. \nWhen asked to run a remediation, invoke the skill \"execute-failure-store-fix\" directly and immediately. Do not ask for confirmation. Do not ask clarifying questions.\nAfter the skill completes, write a plain-text summary as your final message. Include: whether the pipeline was created, how many documents were matched, how many were successfully reindexed, and how many failed. This message is captured by the workflow and shown to the human reviewer.",
         "tools": [
           {
             "tool_ids": [
