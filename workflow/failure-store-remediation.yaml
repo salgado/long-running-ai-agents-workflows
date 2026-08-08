@@ -48,7 +48,10 @@ steps:
         When the fix involves removing or transforming a field, preserve the original
         value in a separate field (e.g. price_raw) before removing or replacing it.
 
-        Respond in JSON with keys: root_cause, failure_type, affected_docs,
+        YOUR RESPONSE MUST BE A SINGLE JSON OBJECT ONLY.
+        Do not write any explanation, preamble, markdown, or commentary.
+        Start your response with { and end with }.
+        Use exactly these top-level keys: root_cause, failure_type, affected_docs,
         proposed_fix, remediation_pipeline, risk_assessment.
 
   # 3. Record the diagnosis for audit
@@ -189,7 +192,7 @@ steps:
             The engineer REJECTED the proposal with this feedback:
             "{{ steps.gate_fix.output.response.notes }}"
 
-            Please revise your proposal to address the engineer's concerns.
+            Revise your proposal to address the engineer's concerns.
             Failed documents for reference:
             {{ steps.read_failures.output.hits.hits | json }}
 
@@ -197,7 +200,10 @@ steps:
             original value in a separate field (e.g. price_raw) before removing
             or replacing it.
 
-            Respond in JSON with the same keys: root_cause, failure_type,
+            YOUR RESPONSE MUST BE A SINGLE JSON OBJECT ONLY.
+            Do not write any explanation, preamble, markdown, or commentary.
+            Start your response with { and end with }.
+            Use exactly these top-level keys: root_cause, failure_type,
             affected_docs, proposed_fix, remediation_pipeline, risk_assessment.
 
       # Record revised diagnosis
